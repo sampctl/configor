@@ -1,4 +1,4 @@
-package configor
+package configor_test
 
 import (
 	"bytes"
@@ -10,22 +10,23 @@ import (
 
 	"github.com/BurntSushi/toml"
 	"gopkg.in/yaml.v2"
+
+	"github.com/Southclaws/configor"
 )
 
 type Anonymous struct {
 	Description string
 }
 
-type testConfig struct {
-	APPName string `default:"configor" json:",omitempty"`
+type Config struct {
+	APPName string `default:"configor"`
 	Hosts   []string
 
 	DB struct {
 		Name     string
 		User     string `default:"root"`
 		Password string `required:"true" env:"DBPassword"`
-		Port     uint   `default:"3306" json:",omitempty"`
-		SSL      bool   `default:"true" json:",omitempty"`
+		Port     uint   `default:"3306"`
 	}
 
 	Contacts []struct {
@@ -38,22 +39,20 @@ type testConfig struct {
 	private string
 }
 
-func generateDefaultConfig() testConfig {
-	return testConfig{
+func generateDefaultConfig() Config {
+	config := Config{
 		APPName: "configor",
 		Hosts:   []string{"http://example.org", "http://jinzhu.me"},
 		DB: struct {
 			Name     string
 			User     string `default:"root"`
 			Password string `required:"true" env:"DBPassword"`
-			Port     uint   `default:"3306" json:",omitempty"`
-			SSL      bool   `default:"true" json:",omitempty"`
+			Port     uint   `default:"3306"`
 		}{
 			Name:     "configor",
 			User:     "configor",
 			Password: "configor",
 			Port:     3306,
-			SSL:      true,
 		},
 		Contacts: []struct {
 			Name  string
@@ -68,9 +67,10 @@ func generateDefaultConfig() testConfig {
 			Description: "This is an anonymous embedded struct whose environment variables should NOT include 'ANONYMOUS'",
 		},
 	}
+	return config
 }
 
-func TestLoadNormaltestConfig(t *testing.T) {
+func TestLoadNormalConfig(t *testing.T) {
 	config := generateDefaultConfig()
 	if bytes, err := json.Marshal(config); err == nil {
 		if file, err := ioutil.TempFile("/tmp", "configor"); err == nil {
@@ -78,8 +78,8 @@ func TestLoadNormaltestConfig(t *testing.T) {
 			defer os.Remove(file.Name())
 			file.Write(bytes)
 
-			var result testConfig
-			Load(&result, file.Name())
+			var result Config
+			configor.Load(&result, file.Name())
 			if !reflect.DeepEqual(result, config) {
 				t.Errorf("result should equal to original configuration")
 			}
@@ -89,7 +89,7 @@ func TestLoadNormaltestConfig(t *testing.T) {
 	}
 }
 
-func TestLoadtestConfigFromTomlWithExtension(t *testing.T) {
+func TestLoadConfigFromTomlWithExtension(t *testing.T) {
 	var (
 		config = generateDefaultConfig()
 		buffer bytes.Buffer
@@ -101,8 +101,8 @@ func TestLoadtestConfigFromTomlWithExtension(t *testing.T) {
 			defer os.Remove(file.Name())
 			file.Write(buffer.Bytes())
 
-			var result testConfig
-			Load(&result, file.Name())
+			var result Config
+			configor.Load(&result, file.Name())
 			if !reflect.DeepEqual(result, config) {
 				t.Errorf("result should equal to original configuration")
 			}
@@ -112,7 +112,7 @@ func TestLoadtestConfigFromTomlWithExtension(t *testing.T) {
 	}
 }
 
-func TestLoadtestConfigFromTomlWithoutExtension(t *testing.T) {
+func TestLoadConfigFromTomlWithoutExtension(t *testing.T) {
 	var (
 		config = generateDefaultConfig()
 		buffer bytes.Buffer
@@ -124,8 +124,8 @@ func TestLoadtestConfigFromTomlWithoutExtension(t *testing.T) {
 			defer os.Remove(file.Name())
 			file.Write(buffer.Bytes())
 
-			var result testConfig
-			Load(&result, file.Name())
+			var result Config
+			configor.Load(&result, file.Name())
 			if !reflect.DeepEqual(result, config) {
 				t.Errorf("result should equal to original configuration")
 			}
@@ -139,7 +139,6 @@ func TestDefaultValue(t *testing.T) {
 	config := generateDefaultConfig()
 	config.APPName = ""
 	config.DB.Port = 0
-	config.DB.SSL = false
 
 	if bytes, err := json.Marshal(config); err == nil {
 		if file, err := ioutil.TempFile("/tmp", "configor"); err == nil {
@@ -147,9 +146,8 @@ func TestDefaultValue(t *testing.T) {
 			defer os.Remove(file.Name())
 			file.Write(bytes)
 
-			var result testConfig
-			Load(&result, file.Name())
-
+			var result Config
+			configor.Load(&result, file.Name())
 			if !reflect.DeepEqual(result, generateDefaultConfig()) {
 				t.Errorf("result should be set default value correctly")
 			}
@@ -169,8 +167,8 @@ func TestMissingRequiredValue(t *testing.T) {
 			defer os.Remove(file.Name())
 			file.Write(bytes)
 
-			var result testConfig
-			if err := Load(&result, file.Name()); err == nil {
+			var result Config
+			if err := configor.Load(&result, file.Name()); err == nil {
 				t.Errorf("Should got error when load configuration missing db password")
 			}
 		}
@@ -179,7 +177,7 @@ func TestMissingRequiredValue(t *testing.T) {
 	}
 }
 
-func TestUnmatchedKeyInTomltestConfigFile(t *testing.T) {
+func TestUnmatchedKeyInTomlConfigFile(t *testing.T) {
 	type configStruct struct {
 		Name string
 	}
@@ -203,24 +201,24 @@ func TestUnmatchedKeyInTomltestConfigFile(t *testing.T) {
 		var result configStruct
 
 		// Do not return error when there are unmatched keys but ErrorOnUnmatchedKeys is false
-		if err := New(&Config{}).Load(&result, filename); err != nil {
+		if err := configor.New(&configor.Config{}).Load(&result, filename); err != nil {
 			t.Errorf("Should NOT get error when loading configuration with extra keys")
 		}
 
 		// Return an error when there are unmatched keys and ErrorOnUnmatchedKeys is true
-		err := New(&Config{ErrorOnUnmatchedKeys: true}).Load(&result, filename)
+		err := configor.New(&configor.Config{ErrorOnUnmatchedKeys: true}).Load(&result, filename)
 		if err == nil {
 			t.Errorf("Should get error when loading configuration with extra keys")
 		}
 
 		// The error should be of type UnmatchedTomlKeysError
-		tomlErr, ok := err.(*UnmatchedTomlKeysError)
+		tomlErr, ok := err.(*configor.UnmatchedTomlKeysError)
 		if !ok {
 			t.Errorf("Should get UnmatchedTomlKeysError error when loading configuration with extra keys")
 		}
 
 		// The error.Keys() function should return the "Test" key
-		keys := GetStringTomlKeys(tomlErr.Keys)
+		keys := configor.GetStringTomlKeys(tomlErr.Keys)
 		if len(keys) != 1 || keys[0] != "Test" {
 			t.Errorf("The UnmatchedTomlKeysError should contain the Test key")
 		}
@@ -240,31 +238,31 @@ func TestUnmatchedKeyInTomltestConfigFile(t *testing.T) {
 	var result configStruct
 
 	// Do not return error when there are unmatched keys but ErrorOnUnmatchedKeys is false
-	if err := New(&Config{}).Load(&result, filename); err != nil {
+	if err = configor.New(&configor.Config{}).Load(&result, filename); err != nil {
 		t.Errorf("Should NOT get error when loading configuration with extra keys. Error: %v", err)
 	}
 
 	// Return an error when there are unmatched keys and ErrorOnUnmatchedKeys is true
-	err = New(&Config{ErrorOnUnmatchedKeys: true}).Load(&result, filename)
+	err = configor.New(&configor.Config{ErrorOnUnmatchedKeys: true}).Load(&result, filename)
 	if err == nil {
 		t.Errorf("Should get error when loading configuration with extra keys")
 	}
 
 	// The error should be of type UnmatchedTomlKeysError
-	tomlErr, ok := err.(*UnmatchedTomlKeysError)
+	tomlErr, ok := err.(*configor.UnmatchedTomlKeysError)
 	if !ok {
 		t.Errorf("Should get UnmatchedTomlKeysError error when loading configuration with extra keys")
 	}
 
 	// The error.Keys() function should return the "Test" key
-	keys := GetStringTomlKeys(tomlErr.Keys)
+	keys := configor.GetStringTomlKeys(tomlErr.Keys)
 	if len(keys) != 1 || keys[0] != "Test" {
 		t.Errorf("The UnmatchedTomlKeysError should contain the Test key")
 	}
 
 }
 
-func TestUnmatchedKeyInYamltestConfigFile(t *testing.T) {
+func TestUnmatchedKeyInYamlConfigFile(t *testing.T) {
 	type configStruct struct {
 		Name string
 	}
@@ -284,18 +282,19 @@ func TestUnmatchedKeyInYamltestConfigFile(t *testing.T) {
 
 	filename := file.Name()
 
-	if data, err := yaml.Marshal(config); err == nil {
+	data, err := yaml.Marshal(config)
+	if err == nil {
 		file.WriteString(string(data))
 
 		var result configStruct
 
 		// Do not return error when there are unmatched keys but ErrorOnUnmatchedKeys is false
-		if err := New(&Config{}).Load(&result, filename); err != nil {
+		if err = configor.New(&configor.Config{}).Load(&result, filename); err != nil {
 			t.Errorf("Should NOT get error when loading configuration with extra keys. Error: %v", err)
 		}
 
 		// Return an error when there are unmatched keys and ErrorOnUnmatchedKeys is true
-		if err := New(&Config{ErrorOnUnmatchedKeys: true}).Load(&result, filename); err == nil {
+		if err = configor.New(&configor.Config{ErrorOnUnmatchedKeys: true}).Load(&result, filename); err == nil {
 			t.Errorf("Should get error when loading configuration with extra keys")
 
 			// The error should be of type *yaml.TypeError
@@ -319,12 +318,12 @@ func TestUnmatchedKeyInYamltestConfigFile(t *testing.T) {
 	var result configStruct
 
 	// Do not return error when there are unmatched keys but ErrorOnUnmatchedKeys is false
-	if err := New(&Config{}).Load(&result, filename); err != nil {
+	if err := configor.New(&configor.Config{}).Load(&result, filename); err != nil {
 		t.Errorf("Should NOT get error when loading configuration with extra keys. Error: %v", err)
 	}
 
 	// Return an error when there are unmatched keys and ErrorOnUnmatchedKeys is true
-	if err := New(&Config{ErrorOnUnmatchedKeys: true}).Load(&result, filename); err == nil {
+	if err := configor.New(&configor.Config{ErrorOnUnmatchedKeys: true}).Load(&result, filename); err == nil {
 		t.Errorf("Should get error when loading configuration with extra keys")
 
 		// The error should be of type *yaml.TypeError
@@ -334,7 +333,7 @@ func TestUnmatchedKeyInYamltestConfigFile(t *testing.T) {
 	}
 }
 
-func TestLoadtestConfigurationByEnvironment(t *testing.T) {
+func TestLoadConfigurationByEnvironment(t *testing.T) {
 	config := generateDefaultConfig()
 	config2 := struct {
 		APPName string
@@ -352,10 +351,10 @@ func TestLoadtestConfigurationByEnvironment(t *testing.T) {
 		ioutil.WriteFile(file.Name()+".production.yaml", config2Bytes, 0644)
 		defer os.Remove(file.Name() + ".production.yaml")
 
-		var result testConfig
+		var result Config
 		os.Setenv("CONFIGOR_ENV", "production")
 		defer os.Setenv("CONFIGOR_ENV", "")
-		if err := Load(&result, file.Name()+".yaml"); err != nil {
+		if err := configor.Load(&result, file.Name()+".yaml"); err != nil {
 			t.Errorf("No error should happen when load configurations, but got %v", err)
 		}
 
@@ -367,7 +366,7 @@ func TestLoadtestConfigurationByEnvironment(t *testing.T) {
 	}
 }
 
-func TestLoadtestConfigurationByEnvironmentSetBytestConfig(t *testing.T) {
+func TestLoadConfigurationByEnvironmentSetByConfig(t *testing.T) {
 	config := generateDefaultConfig()
 	config2 := struct {
 		APPName string
@@ -385,8 +384,8 @@ func TestLoadtestConfigurationByEnvironmentSetBytestConfig(t *testing.T) {
 		ioutil.WriteFile(file.Name()+".production.yaml", config2Bytes, 0644)
 		defer os.Remove(file.Name() + ".production.yaml")
 
-		var result testConfig
-		var Configor = New(&Config{Environment: "production"})
+		var result Config
+		var Configor = configor.New(&configor.Config{Environment: "production"})
 		if Configor.Load(&result, file.Name()+".yaml"); err != nil {
 			t.Errorf("No error should happen when load configurations, but got %v", err)
 		}
@@ -397,13 +396,13 @@ func TestLoadtestConfigurationByEnvironmentSetBytestConfig(t *testing.T) {
 			t.Errorf("result should be load configurations by environment correctly")
 		}
 
-		if Configor.GetEnvironment() != "production" {
+		if Configor.Environment != "production" {
 			t.Errorf("configor's environment should be production")
 		}
 	}
 }
 
-func TestOverwritetestConfigurationWithEnvironmentWithDefaultPrefix(t *testing.T) {
+func TestOverwriteConfigurationWithEnvironmentWithDefaultPrefix(t *testing.T) {
 	config := generateDefaultConfig()
 
 	if bytes, err := json.Marshal(config); err == nil {
@@ -411,14 +410,14 @@ func TestOverwritetestConfigurationWithEnvironmentWithDefaultPrefix(t *testing.T
 			defer file.Close()
 			defer os.Remove(file.Name())
 			file.Write(bytes)
-			var result testConfig
+			var result Config
 			os.Setenv("CONFIGOR_APPNAME", "config2")
 			os.Setenv("CONFIGOR_HOSTS", "- http://example.org\n- http://jinzhu.me")
 			os.Setenv("CONFIGOR_DB_NAME", "db_name")
 			defer os.Setenv("CONFIGOR_APPNAME", "")
 			defer os.Setenv("CONFIGOR_HOSTS", "")
 			defer os.Setenv("CONFIGOR_DB_NAME", "")
-			Load(&result, file.Name())
+			configor.Load(&result, file.Name())
 
 			var defaultConfig = generateDefaultConfig()
 			defaultConfig.APPName = "config2"
@@ -431,7 +430,7 @@ func TestOverwritetestConfigurationWithEnvironmentWithDefaultPrefix(t *testing.T
 	}
 }
 
-func TestOverwritetestConfigurationWithEnvironment(t *testing.T) {
+func TestOverwriteConfigurationWithEnvironment(t *testing.T) {
 	config := generateDefaultConfig()
 
 	if bytes, err := json.Marshal(config); err == nil {
@@ -439,14 +438,14 @@ func TestOverwritetestConfigurationWithEnvironment(t *testing.T) {
 			defer file.Close()
 			defer os.Remove(file.Name())
 			file.Write(bytes)
-			var result testConfig
+			var result Config
 			os.Setenv("CONFIGOR_ENV_PREFIX", "app")
 			os.Setenv("APP_APPNAME", "config2")
 			os.Setenv("APP_DB_NAME", "db_name")
 			defer os.Setenv("CONFIGOR_ENV_PREFIX", "")
 			defer os.Setenv("APP_APPNAME", "")
 			defer os.Setenv("APP_DB_NAME", "")
-			Load(&result, file.Name())
+			configor.Load(&result, file.Name())
 
 			var defaultConfig = generateDefaultConfig()
 			defaultConfig.APPName = "config2"
@@ -458,7 +457,7 @@ func TestOverwritetestConfigurationWithEnvironment(t *testing.T) {
 	}
 }
 
-func TestOverwritetestConfigurationWithEnvironmentThatSetBytestConfig(t *testing.T) {
+func TestOverwriteConfigurationWithEnvironmentThatSetByConfig(t *testing.T) {
 	config := generateDefaultConfig()
 
 	if bytes, err := json.Marshal(config); err == nil {
@@ -471,8 +470,8 @@ func TestOverwritetestConfigurationWithEnvironmentThatSetBytestConfig(t *testing
 			defer os.Setenv("APP1_APPName", "")
 			defer os.Setenv("APP1_DB_Name", "")
 
-			var result testConfig
-			var Configor = New(&Config{ENVPrefix: "APP1"})
+			var result Config
+			var Configor = configor.New(&configor.Config{EnvironmentPrefix: "APP1"})
 			Configor.Load(&result, file.Name())
 
 			var defaultConfig = generateDefaultConfig()
@@ -493,14 +492,14 @@ func TestResetPrefixToBlank(t *testing.T) {
 			defer file.Close()
 			defer os.Remove(file.Name())
 			file.Write(bytes)
-			var result testConfig
+			var result Config
 			os.Setenv("CONFIGOR_ENV_PREFIX", "-")
 			os.Setenv("APPNAME", "config2")
 			os.Setenv("DB_NAME", "db_name")
 			defer os.Setenv("CONFIGOR_ENV_PREFIX", "")
 			defer os.Setenv("APPNAME", "")
 			defer os.Setenv("DB_NAME", "")
-			Load(&result, file.Name())
+			configor.Load(&result, file.Name())
 
 			var defaultConfig = generateDefaultConfig()
 			defaultConfig.APPName = "config2"
@@ -520,14 +519,14 @@ func TestResetPrefixToBlank2(t *testing.T) {
 			defer file.Close()
 			defer os.Remove(file.Name())
 			file.Write(bytes)
-			var result testConfig
+			var result Config
 			os.Setenv("CONFIGOR_ENV_PREFIX", "-")
 			os.Setenv("APPName", "config2")
 			os.Setenv("DB_Name", "db_name")
 			defer os.Setenv("CONFIGOR_ENV_PREFIX", "")
 			defer os.Setenv("APPName", "")
 			defer os.Setenv("DB_Name", "")
-			Load(&result, file.Name())
+			configor.Load(&result, file.Name())
 
 			var defaultConfig = generateDefaultConfig()
 			defaultConfig.APPName = "config2"
@@ -547,10 +546,10 @@ func TestReadFromEnvironmentWithSpecifiedEnvName(t *testing.T) {
 			defer file.Close()
 			defer os.Remove(file.Name())
 			file.Write(bytes)
-			var result testConfig
+			var result Config
 			os.Setenv("DBPassword", "db_password")
 			defer os.Setenv("DBPassword", "")
-			Load(&result, file.Name())
+			configor.Load(&result, file.Name())
 
 			var defaultConfig = generateDefaultConfig()
 			defaultConfig.DB.Password = "db_password"
@@ -569,10 +568,10 @@ func TestAnonymousStruct(t *testing.T) {
 			defer file.Close()
 			defer os.Remove(file.Name())
 			file.Write(bytes)
-			var result testConfig
+			var result Config
 			os.Setenv("CONFIGOR_DESCRIPTION", "environment description")
 			defer os.Setenv("CONFIGOR_DESCRIPTION", "")
-			Load(&result, file.Name())
+			configor.Load(&result, file.Name())
 
 			var defaultConfig = generateDefaultConfig()
 			defaultConfig.Anonymous.Description = "environment description"
@@ -581,103 +580,4 @@ func TestAnonymousStruct(t *testing.T) {
 			}
 		}
 	}
-}
-
-func TestENV(t *testing.T) {
-	if ENV() != "test" {
-		t.Errorf("Env should be test when running `go test`, instead env is %v", ENV())
-	}
-
-	os.Setenv("CONFIGOR_ENV", "production")
-	defer os.Setenv("CONFIGOR_ENV", "")
-	if ENV() != "production" {
-		t.Errorf("Env should be production when set it with CONFIGOR_ENV")
-	}
-}
-
-type slicetestConfig struct {
-	Test1 int
-	Test2 []struct {
-		Test2Ele1 int
-		Test2Ele2 int
-	}
-}
-
-func TestSliceFromEnv(t *testing.T) {
-	var tc = slicetestConfig{
-		Test1: 1,
-		Test2: []struct {
-			Test2Ele1 int
-			Test2Ele2 int
-		}{
-			{
-				Test2Ele1: 1,
-				Test2Ele2: 2,
-			},
-			{
-				Test2Ele1: 3,
-				Test2Ele2: 4,
-			},
-		},
-	}
-
-	var result slicetestConfig
-	os.Setenv("CONFIGOR_TEST1", "1")
-	os.Setenv("CONFIGOR_TEST2_0_TEST2ELE1", "1")
-	os.Setenv("CONFIGOR_TEST2_0_TEST2ELE2", "2")
-
-	os.Setenv("CONFIGOR_TEST2_1_TEST2ELE1", "3")
-	os.Setenv("CONFIGOR_TEST2_1_TEST2ELE2", "4")
-	err := Load(&result)
-	if err != nil {
-		t.Fatalf("load from env err:%v", err)
-	}
-
-	if !reflect.DeepEqual(result, tc) {
-		t.Fatalf("unexpected result:%+v", result)
-	}
-}
-
-func TestConfigFromEnv(t *testing.T) {
-	type config struct {
-		LineBreakString string `required:"true"`
-		Count           int64
-		Slient          bool
-	}
-
-	cfg := &config{}
-
-	os.Setenv("CONFIGOR_ENV_PREFIX", "CONFIGOR")
-	os.Setenv("CONFIGOR_LineBreakString", "Line one\nLine two\nLine three\nAnd more lines")
-	os.Setenv("CONFIGOR_Slient", "1")
-	os.Setenv("CONFIGOR_Count", "10")
-	Load(cfg)
-
-	if os.Getenv("CONFIGOR_LineBreakString") != cfg.LineBreakString {
-		t.Error("Failed to load value has line break from env")
-	}
-
-	if !cfg.Slient {
-		t.Error("Failed to load bool from env")
-	}
-
-	if cfg.Count != 10 {
-		t.Error("Failed to load number from env")
-	}
-}
-
-type Menu struct {
-	Key      string `json:"key" yaml:"key"`
-	Name     string `json:"name" yaml:"name"`
-	Icon     string `json:"icon" yaml:"icon"`
-	Children []Menu `json:"children" yaml:"children"`
-}
-
-type MenuList struct {
-	Top []Menu `json:"top"  yaml:"top"`
-}
-
-func TestLoadNestedConfig(t *testing.T) {
-	adminConfig := MenuList{}
-	New(&Config{Verbose: true}).Load(&adminConfig, "admin.yml")
 }
