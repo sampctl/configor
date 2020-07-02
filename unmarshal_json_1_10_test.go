@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/Southclaws/configor"
+	"github.com/sampctl/configor"
 )
 
 func TestUnmatchedKeyInJsonConfigFile(t *testing.T) {

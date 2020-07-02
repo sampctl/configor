@@ -1,4 +1,4 @@
-module github.com/Southclaws/configor
+module github.com/sampctl/configor
 
 require (
 	github.com/BurntSushi/toml v0.3.0
