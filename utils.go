@@ -238,6 +238,12 @@ func (configor *Configor) processDefaults(config interface{}) error {
 
 func (configor *Configor) processTags(config interface{}, prefixes ...string) error {
 	configValue := reflect.Indirect(reflect.ValueOf(config))
+
+	// if the field is a pointer, keep dereferencing it until it's a struct
+	for configValue.Kind() == reflect.Ptr {
+		configValue = configValue.Elem()
+	}
+
 	if configValue.Kind() != reflect.Struct {
 		return errors.New("invalid config, should be struct")
 	}
