@@ -98,33 +98,33 @@ func (configor *Configor) getConfigurationFiles(watchMode bool, files ...string)
 	return resultKeys, results
 }
 
-func processFile(config interface{}, file string, errorOnUnmatchedKeys bool) error {
+func processFile(config interface{}, file string, errorOnUnmatchedKeys bool) (err error, format string) {
 	data, err := ioutil.ReadFile(file)
 	if err != nil {
-		return err
+		return err, ""
 	}
 
 	switch {
 	case strings.HasSuffix(file, ".yaml") || strings.HasSuffix(file, ".yml"):
 		if errorOnUnmatchedKeys {
-			return yaml.UnmarshalStrict(data, config)
+			return yaml.UnmarshalStrict(data, config), "yaml"
 		}
-		return yaml.Unmarshal(data, config)
+		return yaml.Unmarshal(data, config), "yaml"
 	case strings.HasSuffix(file, ".toml"):
-		return unmarshalToml(data, config, errorOnUnmatchedKeys)
+		return unmarshalToml(data, config, errorOnUnmatchedKeys), "toml"
 	case strings.HasSuffix(file, ".json"):
-		return unmarshalJSON(data, config, errorOnUnmatchedKeys)
+		return unmarshalJSON(data, config, errorOnUnmatchedKeys), "json"
 	default:
 		if err := unmarshalToml(data, config, errorOnUnmatchedKeys); err == nil {
-			return nil
+			return nil, "toml"
 		} else if errUnmatchedKeys, ok := err.(*UnmatchedTomlKeysError); ok {
-			return errUnmatchedKeys
+			return errUnmatchedKeys, "toml"
 		}
 
 		if err := unmarshalJSON(data, config, errorOnUnmatchedKeys); err == nil {
-			return nil
+			return nil, "json"
 		} else if strings.Contains(err.Error(), "json: unknown field") {
-			return err
+			return err, "json"
 		}
 
 		var yamlError error
@@ -135,12 +135,12 @@ func processFile(config interface{}, file string, errorOnUnmatchedKeys bool) err
 		}
 
 		if yamlError == nil {
-			return nil
+			return nil, "yaml"
 		} else if yErr, ok := yamlError.(*yaml.TypeError); ok {
-			return yErr
+			return yErr, "yaml"
 		}
 
-		return errors.New("failed to decode config")
+		return errors.New("failed to decode config"), ""
 	}
 }
 
@@ -349,7 +349,7 @@ func (configor *Configor) processTags(config interface{}, prefixes ...string) er
 	return nil
 }
 
-func (configor *Configor) load(config interface{}, watchMode bool, files ...string) (err error, changed bool) {
+func (configor *Configor) load(config interface{}, watchMode bool, files ...string) (format string, changed bool, err error) {
 	defer func() {
 		if configor.Config.Debug || configor.Config.Verbose {
 			if err != nil {
@@ -372,7 +372,7 @@ func (configor *Configor) load(config interface{}, watchMode bool, files ...stri
 			}
 
 			if !changed {
-				return nil, false
+				return format, false, nil
 			}
 		}
 	}
@@ -384,8 +384,8 @@ func (configor *Configor) load(config interface{}, watchMode bool, files ...stri
 		if configor.Config.Debug || configor.Config.Verbose {
 			fmt.Printf("Loading configurations from file '%v'...\n", file)
 		}
-		if err = processFile(config, file, configor.GetErrorOnUnmatchedKeys()); err != nil {
-			return err, true
+		if err, format = processFile(config, file, configor.GetErrorOnUnmatchedKeys()); err != nil {
+			return format, true, err
 		}
 	}
 	configor.configModTimes = configModTimeMap
@@ -396,5 +396,5 @@ func (configor *Configor) load(config interface{}, watchMode bool, files ...stri
 		err = configor.processTags(config, prefix)
 	}
 
-	return err, true
+	return format, true, err
 }
