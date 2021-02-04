@@ -98,33 +98,33 @@ func (configor *Configor) getConfigurationFiles(watchMode bool, files ...string)
 	return resultKeys, results
 }
 
-func processFile(config interface{}, file string, errorOnUnmatchedKeys bool) (err error, format string) {
+func processFile(config interface{}, file string, errorOnUnmatchedKeys bool) (format string, err error) {
 	data, err := ioutil.ReadFile(file)
 	if err != nil {
-		return err, ""
+		return "", err
 	}
 
 	switch {
 	case strings.HasSuffix(file, ".yaml") || strings.HasSuffix(file, ".yml"):
 		if errorOnUnmatchedKeys {
-			return yaml.UnmarshalStrict(data, config), "yaml"
+			return "yaml", yaml.UnmarshalStrict(data, config)
 		}
-		return yaml.Unmarshal(data, config), "yaml"
+		return "yaml", yaml.Unmarshal(data, config)
 	case strings.HasSuffix(file, ".toml"):
-		return unmarshalToml(data, config, errorOnUnmatchedKeys), "toml"
+		return "toml", unmarshalToml(data, config, errorOnUnmatchedKeys)
 	case strings.HasSuffix(file, ".json"):
-		return unmarshalJSON(data, config, errorOnUnmatchedKeys), "json"
+		return "json", unmarshalJSON(data, config, errorOnUnmatchedKeys)
 	default:
 		if err := unmarshalToml(data, config, errorOnUnmatchedKeys); err == nil {
-			return nil, "toml"
+			return "toml", nil
 		} else if errUnmatchedKeys, ok := err.(*UnmatchedTomlKeysError); ok {
-			return errUnmatchedKeys, "toml"
+			return "toml", errUnmatchedKeys
 		}
 
 		if err := unmarshalJSON(data, config, errorOnUnmatchedKeys); err == nil {
-			return nil, "json"
+			return "json", nil
 		} else if strings.Contains(err.Error(), "json: unknown field") {
-			return err, "json"
+			return "json", err
 		}
 
 		var yamlError error
@@ -135,12 +135,12 @@ func processFile(config interface{}, file string, errorOnUnmatchedKeys bool) (er
 		}
 
 		if yamlError == nil {
-			return nil, "yaml"
+			return "yaml", nil
 		} else if yErr, ok := yamlError.(*yaml.TypeError); ok {
-			return yErr, "yaml"
+			return "yaml", yErr
 		}
 
-		return errors.New("failed to decode config"), ""
+		return "", errors.New("failed to decode config")
 	}
 }
 
@@ -349,7 +349,7 @@ func (configor *Configor) processTags(config interface{}, prefixes ...string) er
 	return nil
 }
 
-func (configor *Configor) load(config interface{}, watchMode bool, files ...string) (format string, changed bool, err error) {
+func (configor *Configor) load(config interface{}, watchMode bool, files ...string) (file string, format string, changed bool, err error) {
 	defer func() {
 		if configor.Config.Debug || configor.Config.Verbose {
 			if err != nil {
@@ -372,7 +372,7 @@ func (configor *Configor) load(config interface{}, watchMode bool, files ...stri
 			}
 
 			if !changed {
-				return format, false, nil
+				return file, format, false, nil
 			}
 		}
 	}
@@ -384,8 +384,8 @@ func (configor *Configor) load(config interface{}, watchMode bool, files ...stri
 		if configor.Config.Debug || configor.Config.Verbose {
 			fmt.Printf("Loading configurations from file '%v'...\n", file)
 		}
-		if err, format = processFile(config, file, configor.GetErrorOnUnmatchedKeys()); err != nil {
-			return format, true, err
+		if format, err = processFile(config, file, configor.GetErrorOnUnmatchedKeys()); err != nil {
+			return file, format, true, err
 		}
 	}
 	configor.configModTimes = configModTimeMap
@@ -396,5 +396,5 @@ func (configor *Configor) load(config interface{}, watchMode bool, files ...stri
 		err = configor.processTags(config, prefix)
 	}
 
-	return format, true, err
+	return file, format, true, err
 }

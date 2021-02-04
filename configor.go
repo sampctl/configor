@@ -80,12 +80,12 @@ func (configor *Configor) GetErrorOnUnmatchedKeys() bool {
 }
 
 // Load will unmarshal configurations to struct from files that you provide
-func (configor *Configor) Load(config interface{}, files ...string) (format string, err error) {
+func (configor *Configor) Load(config interface{}, files ...string) (file string, format string, err error) {
 	defaultValue := reflect.Indirect(reflect.ValueOf(config))
 	if !defaultValue.CanAddr() {
-		return "", fmt.Errorf("Config %v should be addressable", config)
+		return "", "", fmt.Errorf("Config %v should be addressable", config)
 	}
-	format, _, err = configor.load(config, false, files...)
+	file, format, _, err = configor.load(config, false, files...)
 
 	if configor.Config.AutoReload {
 		go func() {
@@ -95,7 +95,7 @@ func (configor *Configor) Load(config interface{}, files ...string) (format stri
 				reflectPtr.Elem().Set(defaultValue)
 
 				var changed bool
-				if format, changed, err = configor.load(reflectPtr.Interface(), true, files...); err == nil && changed {
+				if file, format, changed, err = configor.load(reflectPtr.Interface(), true, files...); err == nil && changed {
 					reflect.ValueOf(config).Elem().Set(reflectPtr.Elem())
 					if configor.Config.AutoReloadCallback != nil {
 						configor.Config.AutoReloadCallback(config)
@@ -116,6 +116,6 @@ func ENV() string {
 }
 
 // Load will unmarshal configurations to struct from files that you provide
-func Load(config interface{}, files ...string) (format string, err error) {
+func Load(config interface{}, files ...string) (file string, format string, err error) {
 	return New(nil).Load(config, files...)
 }

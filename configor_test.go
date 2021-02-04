@@ -170,7 +170,7 @@ func TestMissingRequiredValue(t *testing.T) {
 			file.Write(bytes)
 
 			var result testConfig
-			if _, err := Load(&result, file.Name()); err == nil {
+			if _, _, err := Load(&result, file.Name()); err == nil {
 				t.Errorf("Should got error when load configuration missing db password")
 			}
 		}
@@ -203,12 +203,12 @@ func TestUnmatchedKeyInTomltestConfigFile(t *testing.T) {
 		var result configStruct
 
 		// Do not return error when there are unmatched keys but ErrorOnUnmatchedKeys is false
-		if _, err := New(&Config{}).Load(&result, filename); err != nil {
+		if _, _, err := New(&Config{}).Load(&result, filename); err != nil {
 			t.Errorf("Should NOT get error when loading configuration with extra keys")
 		}
 
 		// Return an error when there are unmatched keys and ErrorOnUnmatchedKeys is true
-		_, err := New(&Config{ErrorOnUnmatchedKeys: true}).Load(&result, filename)
+		_, _, err := New(&Config{ErrorOnUnmatchedKeys: true}).Load(&result, filename)
 		if err == nil {
 			t.Errorf("Should get error when loading configuration with extra keys")
 		}
@@ -240,12 +240,12 @@ func TestUnmatchedKeyInTomltestConfigFile(t *testing.T) {
 	var result configStruct
 
 	// Do not return error when there are unmatched keys but ErrorOnUnmatchedKeys is false
-	if _, err := New(&Config{}).Load(&result, filename); err != nil {
+	if _, _, err := New(&Config{}).Load(&result, filename); err != nil {
 		t.Errorf("Should NOT get error when loading configuration with extra keys. Error: %v", err)
 	}
 
 	// Return an error when there are unmatched keys and ErrorOnUnmatchedKeys is true
-	_, err = New(&Config{ErrorOnUnmatchedKeys: true}).Load(&result, filename)
+	_, _, err = New(&Config{ErrorOnUnmatchedKeys: true}).Load(&result, filename)
 	if err == nil {
 		t.Errorf("Should get error when loading configuration with extra keys")
 	}
@@ -290,12 +290,12 @@ func TestUnmatchedKeyInYamltestConfigFile(t *testing.T) {
 		var result configStruct
 
 		// Do not return error when there are unmatched keys but ErrorOnUnmatchedKeys is false
-		if _, err := New(&Config{}).Load(&result, filename); err != nil {
+		if _, _, err := New(&Config{}).Load(&result, filename); err != nil {
 			t.Errorf("Should NOT get error when loading configuration with extra keys. Error: %v", err)
 		}
 
 		// Return an error when there are unmatched keys and ErrorOnUnmatchedKeys is true
-		if _, err := New(&Config{ErrorOnUnmatchedKeys: true}).Load(&result, filename); err == nil {
+		if _, _, err := New(&Config{ErrorOnUnmatchedKeys: true}).Load(&result, filename); err == nil {
 			t.Errorf("Should get error when loading configuration with extra keys")
 
 			// The error should be of type *yaml.TypeError
@@ -319,12 +319,12 @@ func TestUnmatchedKeyInYamltestConfigFile(t *testing.T) {
 	var result configStruct
 
 	// Do not return error when there are unmatched keys but ErrorOnUnmatchedKeys is false
-	if _, err := New(&Config{}).Load(&result, filename); err != nil {
+	if _, _, err := New(&Config{}).Load(&result, filename); err != nil {
 		t.Errorf("Should NOT get error when loading configuration with extra keys. Error: %v", err)
 	}
 
 	// Return an error when there are unmatched keys and ErrorOnUnmatchedKeys is true
-	if _, err := New(&Config{ErrorOnUnmatchedKeys: true}).Load(&result, filename); err == nil {
+	if _, _, err := New(&Config{ErrorOnUnmatchedKeys: true}).Load(&result, filename); err == nil {
 		t.Errorf("Should get error when loading configuration with extra keys")
 
 		// The error should be of type *yaml.TypeError
@@ -355,7 +355,7 @@ func TestLoadtestConfigurationByEnvironment(t *testing.T) {
 		var result testConfig
 		os.Setenv("CONFIGOR_ENV", "production")
 		defer os.Setenv("CONFIGOR_ENV", "")
-		if _, err := Load(&result, file.Name()+".yaml"); err != nil {
+		if _, _, err := Load(&result, file.Name()+".yaml"); err != nil {
 			t.Errorf("No error should happen when load configurations, but got %v", err)
 		}
 
@@ -628,7 +628,7 @@ func TestSliceFromEnv(t *testing.T) {
 
 	os.Setenv("CONFIGOR_TEST2_1_TEST2ELE1", "3")
 	os.Setenv("CONFIGOR_TEST2_1_TEST2ELE2", "4")
-	_, err := Load(&result)
+	_, _, err := Load(&result)
 	if err != nil {
 		t.Fatalf("load from env err:%v", err)
 	}
