@@ -380,13 +380,14 @@ func (configor *Configor) load(config interface{}, watchMode bool, files ...stri
 	// process defaults
 	configor.processDefaults(config)
 
-	for _, file := range configFiles {
+	for _, f := range configFiles {
 		if configor.Config.Debug || configor.Config.Verbose {
-			fmt.Printf("Loading configurations from file '%v'...\n", file)
+			fmt.Printf("Loading configurations from file '%v'...\n", f)
 		}
-		if format, err = processFile(config, file, configor.GetErrorOnUnmatchedKeys()); err != nil {
-			return file, format, true, err
+		if format, err = processFile(config, f, configor.GetErrorOnUnmatchedKeys()); err != nil {
+			return f, format, true, err
 		}
+		file = f
 	}
 	configor.configModTimes = configModTimeMap
 
